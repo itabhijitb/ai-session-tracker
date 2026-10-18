@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include pyproject.toml
+recursive-include src/ai_session_tracker *.py
+recursive-include tests *.py
+include install.sh
+include install.ps1
+include Makefile

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-session-tracker"
+version = "0.1.0"
+description = "Unified session search across AI coding agents (Devin, Claude Code, Cursor, Windsurf)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Abhijit Bhattacharya" }
+]
+maintainers = [
+    { name = "Abhijit Bhattacharya" }
+]
+keywords = ["ai", "coding-agent", "session", "search", "devin", "claude", "cursor", "windsurf", "sqlite", "fts5"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "click>=8.1,<9",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov", "ruff"]
+test = ["pytest>=7.0", "pytest-cov"]
+
+[project.scripts]
+ais = "ai_session_tracker.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/abhijit-bhattacharya/ai-session-tracker"
+Documentation = "https://github.com/abhijit-bhattacharya/ai-session-tracker#readme"
+Repository = "https://github.com/abhijit-bhattacharya/ai-session-tracker"
+Issues = "https://github.com/abhijit-bhattacharya/ai-session-tracker/issues"
+Changelog = "https://github.com/abhijit-bhattacharya/ai-session-tracker/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_session_tracker"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

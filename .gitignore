@@ -1,0 +1,11 @@
+__pycache__/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+*.pyc
+.config/ai-session-tracker/
+.venv/
+venv/
+*.whl
+*.tar.gz
