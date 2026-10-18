@@ -7,37 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Initial release of ai-session-tracker
-- Unified search across Devin CLI, Claude Code, Cursor, and Windsurf
-- SQLite FTS5 full-text search index
-- Deep search inside full conversation content
-- Time-based filtering with natural language dates
-- Auto-setup on first run (updates AGENTS.md across detected agents)
-- Cold start indexing during installation
-- Cross-platform support (macOS, Linux, Windows)
-- CLI with rich table output
-- Session preview functionality
-- Agent-specific resume commands
-
-### Features
-- Adapter pattern for extensible agent support
-- Platform-aware path resolution
-- Auto-fallback from title search to deep search
-- Minimum 3-char guard on deep search to prevent false positives
-- `>>>` marker on most recent session in results
-- Installation scripts for all platforms
-
 ## [0.1.0] - 2026-10-18
 
 ### Added
 - Initial public release
-- Support for Devin CLI sessions
-- Support for Claude Code sessions
-- Support for Cursor sessions
-- Support for Windsurf sessions
-- Unified SQLite FTS5 search index
-- CLI commands: search, list, preview, status, index
-- Auto-index on first run
-- Installation scripts (install.sh, install.ps1)
-- AGENTS.md integration with detected agents
+- Unified search across Devin CLI, Claude Code, Cursor, and Windsurf sessions
+- SQLite FTS5 full-text search index, with auto-fallback to deep (full conversation) search
+- Time-based filtering with natural language dates ("last week", "3 days ago", ISO dates)
+- CLI commands: search, list, preview, status, index, setup
+- `ais setup` (also run by the install scripts) adds or refreshes an `ais` section in
+  `~/.claude/AGENTS.md` and `~/.config/devin/AGENTS.md`
+- Index is built on first run and refreshed automatically when older than 5 minutes
+- `ais preview` accepts the truncated session IDs shown in result tables
+- `>>>` marker on the most recent session and agent-specific resume hints
+- Installation scripts (install.sh, install.ps1); cross-platform path resolution
+
+### Fixed
+- Timestamps from different agents (UTC ISO, local SQLite, epoch millis) are normalized to
+  local time, so "most recent" ordering and `--since`/`--before` filters are correct
+- Claude Code session directories containing `-` are no longer shown as `/`

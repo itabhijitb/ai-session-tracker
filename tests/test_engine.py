@@ -10,7 +10,7 @@ from ai_session_tracker.models import Session
 def test_engine_init():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
-        engine = SearchEngine(db_path=db_path)
+        _ = SearchEngine(db_path=db_path)
         assert db_path.exists()
 
 
@@ -50,3 +50,27 @@ def test_session_model_untitled():
 def test_session_model_no_title():
     s = Session(session_id="x", agent="devin", directory="/tmp")
     assert s.display_title == "(untitled)"
+
+
+def test_engine_records_last_indexed():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        engine = SearchEngine(db_path=Path(tmpdir) / "test.db")
+        assert engine.last_indexed() is None
+        engine.reindex()
+        assert engine.last_indexed() is not None
+
+
+def test_resolve_session_id_prefix():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        engine = SearchEngine(db_path=Path(tmpdir) / "test.db")
+        db = engine._conn()
+        db.executemany(
+            "INSERT INTO sessions (session_id, agent) VALUES (?, ?)",
+            [("abc-111", "claude-code"), ("abc-222", "devin"), ("xyz-999", "devin")],
+        )
+        db.commit()
+        db.close()
+        assert engine.resolve_session_id("xyz") == ("xyz-999", "devin")
+        assert engine.resolve_session_id("abc") is None  # ambiguous
+        assert engine.resolve_session_id("abc", agent="devin") == ("abc-222", "devin")
+        assert engine.resolve_session_id("nope") is None

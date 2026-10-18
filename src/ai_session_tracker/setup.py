@@ -2,83 +2,66 @@
 
 from __future__ import annotations
 
-import json
-import platform
+import re
 from pathlib import Path
 
-from ai_session_tracker.adapters import ALL_ADAPTERS, BaseAdapter
+from ai_session_tracker.adapters import ALL_ADAPTERS
+
+SECTION_HEADER = "## ais (ai-session-tracker)"
+
+# agent name -> (AGENTS.md path, default file header, agent-specific closing line)
+AGENT_TARGETS = {
+    "devin": (
+        Path.home() / ".config" / "devin" / "AGENTS.md",
+        "# Devin AGENTS\n",
+        "**Resume**: Use `devin -r <session-id>` to resume sessions found by `ais`.",
+    ),
+    "claude-code": (
+        Path.home() / ".claude" / "AGENTS.md",
+        "# Claude Code AGENTS\n",
+        "**Resume**: Use `/resume` inside Claude Code to resume sessions found by `ais`.",
+    ),
+}
 
 
-def _update_devin_agents_md():
-    """Update ~/.config/devin/AGENTS.md with ais information."""
-    devin_agents = Path.home() / ".config" / "devin" / "AGENTS.md"
-    devin_agents.parent.mkdir(parents=True, exist_ok=True)
-
-    if devin_agents.exists():
-        content = devin_agents.read_text(encoding="utf-8", errors="replace")
-    else:
-        content = "# Devin AGENTS\n\n"
-
-    ais_section = """
-## ais (ai-session-tracker)
+def _ais_section(resume_line: str) -> str:
+    return f"""{SECTION_HEADER}
 
 Unified session search across AI coding agents (Devin, Claude Code, Cursor, Windsurf).
 
-**Installation**: `pip install -e ~/Projects/ai-session-tracker`
+**Installation**: `pip install ai-session-tracker`
 
 **Commands**:
 - `ais search "keyword"` — Search across all AI agent sessions
 - `ais search --deep "keyword"` — Deep search (full conversation content)
-- `ais search --agent devin "key"` — Search only Devin sessions
-- `ais list` — List recent sessions
-- `ais list --agent claude-code` — List only Claude Code sessions
-- `ais status` — Show detected agents
-- `ais index` — Rebuild the search index
-- `ais preview <session-id>` — Preview a session without resuming
-
-**Integration**: The `devin-sessions` wrapper script delegates to `ais` for search operations.
-"""
-
-    if "ais (ai-session-tracker)" not in content:
-        with open(devin_agents, "a", encoding="utf-8") as f:
-            f.write(ais_section)
-        print(f"[updated] {devin_agents}")
-
-
-def _update_claude_agents_md():
-    """Update ~/.claude/AGENTS.md with ais information."""
-    claude_agents = Path.home() / ".claude" / "AGENTS.md"
-    claude_agents.parent.mkdir(parents=True, exist_ok=True)
-
-    if claude_agents.exists():
-        content = claude_agents.read_text(encoding="utf-8", errors="replace")
-    else:
-        content = "# Claude Code AGENTS\n\n"
-
-    ais_section = """
-## ais (ai-session-tracker)
-
-Unified session search across AI coding agents (Devin, Claude Code, Cursor, Windsurf).
-
-**Installation**: `pip install -e ~/Projects/ai-session-tracker`
-
-**Commands**:
-- `ais search "keyword"` — Search across all AI agent sessions
-- `ais search --deep "keyword"` — Deep search (full conversation content)
-- `ais search --agent claude-code "key"` — Search only Claude Code sessions
+- `ais search --agent claude-code "key"` — Search only one agent's sessions
 - `ais list` — List recent sessions
 - `ais list --agent devin` — List only Devin sessions
 - `ais status` — Show detected agents
 - `ais index` — Rebuild the search index
 - `ais preview <session-id>` — Preview a session without resuming
 
-**Resume**: Use `/resume` inside Claude Code to resume sessions found by `ais`.
+{resume_line}
 """
 
-    if "ais (ai-session-tracker)" not in content:
-        with open(claude_agents, "a", encoding="utf-8") as f:
-            f.write(ais_section)
-        print(f"[updated] {claude_agents}")
+
+def update_agents_md(path: Path, default_header: str, resume_line: str) -> bool:
+    """Insert or refresh the ais section in an AGENTS.md file. Returns True if the file changed."""
+    section = _ais_section(resume_line)
+    content = path.read_text(encoding="utf-8", errors="replace") if path.exists() else default_header
+
+    # Existing section runs from its header to the next top-level "## " heading or EOF
+    pattern = re.compile(rf"^{re.escape(SECTION_HEADER)}\n.*?(?=^## |\Z)", re.DOTALL | re.MULTILINE)
+    if pattern.search(content):
+        new_content = pattern.sub(lambda _: section + "\n", content, count=1).rstrip("\n") + "\n"
+    else:
+        new_content = content.rstrip("\n") + "\n\n" + section
+
+    if new_content == content:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(new_content, encoding="utf-8")
+    return True
 
 
 def setup_agents():
@@ -87,11 +70,13 @@ def setup_agents():
 
     for adapter_cls in ALL_ADAPTERS:
         adapter = adapter_cls()
-        if adapter.is_available():
-            if adapter.name == "devin":
-                _update_devin_agents_md()
-            elif adapter.name == "claude-code":
-                _update_claude_agents_md()
+        target = AGENT_TARGETS.get(adapter.name)
+        if target and adapter.is_available():
+            path, header, resume_line = target
+            if update_agents_md(path, header, resume_line):
+                print(f"[updated] {path}")
+            else:
+                print(f"[ok] {path} already up to date")
 
     print("[setup] AGENTS.md updates complete")
 

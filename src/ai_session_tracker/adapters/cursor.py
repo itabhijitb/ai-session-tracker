@@ -78,8 +78,7 @@ class CursorAdapter(BaseAdapter):
                     continue
                 ws_info = self._read_workspace_json(ws_dir)
                 folder = ws_info.get("folder", ws_info.get("workspace", ""))
-                if folder.startswith("file://"):
-                    folder = folder[7:]
+                folder = folder.removeprefix("file://")
                 sessions.append(
                     Session(
                         session_id=ws_dir.name,
@@ -107,7 +106,9 @@ class CursorAdapter(BaseAdapter):
                                     msgs = conv.get("messages", conv.get("text", []))
                                     if isinstance(msgs, list) and msgs:
                                         m = msgs[0]
-                                        first_msg = (m.get("text", m.get("content", "")) if isinstance(m, dict) else str(m))[:150]
+                                        first_msg = (
+                                            m.get("text", m.get("content", "")) if isinstance(m, dict) else str(m)
+                                        )[:150]
                                     sessions.append(
                                         Session(
                                             session_id=str(sid),

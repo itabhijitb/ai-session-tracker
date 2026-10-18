@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import re
+import time
+from datetime import datetime, timedelta
 
 import click
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from ai_session_tracker.index.engine import SearchEngine
-from ai_session_tracker.models import Session, SessionPreview
+from ai_session_tracker.models import Session
 
 console = Console()
 
@@ -30,19 +31,22 @@ def _resume_hint(session: Session) -> str:
 
 def _render_table(sessions: list[Session], title: str = "Sessions"):
     if not sessions:
-        console.print(Panel(
-            "[yellow]No matching sessions found.[/yellow]\n\n"
-            "Suggestions:\n"
-            "  - Try broader keywords:  [bold]ais search pipeline[/bold]\n"
-            "  - Search inside conversations:  [bold]ais search --deep \"exact phrase\"[/bold]\n"
-            "  - Rebuild the index:  [bold]ais index[/bold]\n"
-            "  - Check detected agents:  [bold]ais status[/bold]",
-            title="No Results",
-            border_style="yellow",
-        ))
+        console.print(
+            Panel(
+                "[yellow]No matching sessions found.[/yellow]\n\n"
+                "Suggestions:\n"
+                "  - Try broader keywords:  [bold]ais search pipeline[/bold]\n"
+                '  - Search inside conversations:  [bold]ais search --deep "exact phrase"[/bold]\n'
+                "  - Rebuild the index:  [bold]ais index[/bold]\n"
+                "  - Check detected agents:  [bold]ais status[/bold]",
+                title="No Results",
+                border_style="yellow",
+            )
+        )
         return
 
     from pathlib import Path
+
     home = str(Path.home())
 
     t = Table(title=title, show_lines=False, pad_edge=False)
@@ -62,7 +66,7 @@ def _render_table(sessions: list[Session], title: str = "Sessions"):
 
         d = s.directory
         if d.startswith(home):
-            d = "~" + d[len(home):]
+            d = "~" + d[len(home) :]
         if len(d) > 40:
             d = ".." + d[-38:]
 
@@ -80,9 +84,9 @@ def _render_table(sessions: list[Session], title: str = "Sessions"):
 
     latest = sessions[0]
     console.print()
-    console.print(f"  [bold yellow]>>>[/bold yellow] = most recent session")
+    console.print("  [bold yellow]>>>[/bold yellow] = most recent session")
     console.print(f"  [bold]To resume latest:[/bold] [green]{_resume_hint(latest)}[/green]")
-    console.print(f"  [dim]To resume any other: replace the session ID in the command above[/dim]")
+    console.print("  [dim]To resume any other: replace the session ID in the command above[/dim]")
 
 
 def _parse_date(value: str) -> str | None:
@@ -128,10 +132,17 @@ def _filter_by_time(sessions: list[Session], since: str | None, before: str | No
     return filtered
 
 
-def _auto_index_if_empty(engine: SearchEngine) -> bool:
-    sessions = engine.list_sessions(limit=1)
-    if sessions:
-        return False
+INDEX_MAX_AGE_SECONDS = 300
+
+
+def _ensure_index(engine: SearchEngine) -> None:
+    """Build the index on first run, and quietly refresh it when it is stale."""
+    last = engine.last_indexed()
+    if last is not None and time.time() - last < INDEX_MAX_AGE_SECONDS:
+        return
+    if last is not None or engine.list_sessions(limit=1):
+        engine.reindex()
+        return
     console.print("[dim]First run detected — building index from all agents...[/dim]")
     counts = engine.reindex()
     total = sum(counts.values())
@@ -142,7 +153,6 @@ def _auto_index_if_empty(engine: SearchEngine) -> bool:
             "[yellow]No sessions found. Make sure you have at least one AI agent "
             "(Devin, Claude Code, Cursor, or Windsurf) installed and have used it.[/yellow]\n"
         )
-    return True
 
 
 @click.group()
@@ -163,33 +173,23 @@ def main():
 
       ais status                       See which agents are detected
 
+      ais setup                        Add ais instructions to agents' AGENTS.md
+
     """
-    # Run setup on first invocation (cold start)
-    from pathlib import Path
-    setup_flag = Path.home() / ".config" / "ai-session-tracker" / ".setup_complete"
-    if not setup_flag.exists():
-        setup_flag.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            from ai_session_tracker.setup import setup_agents
-            setup_agents()
-            setup_flag.touch()
-        except Exception:
-            pass  # Non-critical, continue
 
 
 @main.command()
 @click.argument("query", nargs=-1, required=True)
-@click.option("--agent", "-a", default=None,
-              help="Only search one agent: devin, claude-code, cursor, or windsurf")
-@click.option("--deep", "-d", is_flag=True,
-              help="Search inside full conversations, not just titles (slower but thorough)")
-@click.option("--since", "-s", default=None,
-              help='Only show sessions after this date: "2026-10-01", "last week", "3 days ago"')
-@click.option("--before", "-b", default=None,
-              help='Only show sessions before this date: "2026-10-01", "yesterday"')
+@click.option("--agent", "-a", default=None, help="Only search one agent: devin, claude-code, cursor, or windsurf")
+@click.option(
+    "--deep", "-d", is_flag=True, help="Search inside full conversations, not just titles (slower but thorough)"
+)
+@click.option(
+    "--since", "-s", default=None, help='Only show sessions after this date: "2026-10-01", "last week", "3 days ago"'
+)
+@click.option("--before", "-b", default=None, help='Only show sessions before this date: "2026-10-01", "yesterday"')
 @click.option("--limit", "-n", default=30, help="Maximum number of results to show")
-def search(query: tuple[str, ...], agent: str | None, deep: bool,
-           since: str | None, before: str | None, limit: int):
+def search(query: tuple[str, ...], agent: str | None, deep: bool, since: str | None, before: str | None, limit: int):
     """Search your AI coding sessions by keyword.
 
     Searches session titles and first prompts. If nothing is found, automatically
@@ -205,7 +205,7 @@ def search(query: tuple[str, ...], agent: str | None, deep: bool,
     """
     q = " ".join(query)
     engine = SearchEngine()
-    _auto_index_if_empty(engine)
+    _ensure_index(engine)
 
     if deep:
         results = engine.deep_search(q, agent=agent, limit=limit)
@@ -215,9 +215,7 @@ def search(query: tuple[str, ...], agent: str | None, deep: bool,
         if not results:
             results = engine.deep_search(q, agent=agent, limit=limit)
             if results:
-                console.print(
-                    "[dim]No match in titles — searched inside full conversations instead.[/dim]\n"
-                )
+                console.print("[dim]No match in titles — searched inside full conversations instead.[/dim]\n")
         title = f"Results for '{q}'"
 
     if since or before:
@@ -231,17 +229,16 @@ def search(query: tuple[str, ...], agent: str | None, deep: bool,
 
 
 @main.command(name="list")
-@click.option("--agent", "-a", default=None,
-              help="Only list one agent: devin, claude-code, cursor, or windsurf")
-@click.option("--dir", "-d", "directory", default=None,
-              help="Only show sessions from this folder (partial match works)")
-@click.option("--since", "-s", default=None,
-              help='Only show sessions after this date: "2026-10-01", "last week", "3 days ago"')
-@click.option("--before", "-b", default=None,
-              help='Only show sessions before this date: "2026-10-01", "yesterday"')
+@click.option("--agent", "-a", default=None, help="Only list one agent: devin, claude-code, cursor, or windsurf")
+@click.option(
+    "--dir", "-d", "directory", default=None, help="Only show sessions from this folder (partial match works)"
+)
+@click.option(
+    "--since", "-s", default=None, help='Only show sessions after this date: "2026-10-01", "last week", "3 days ago"'
+)
+@click.option("--before", "-b", default=None, help='Only show sessions before this date: "2026-10-01", "yesterday"')
 @click.option("--limit", "-n", default=30, help="Maximum number of results to show")
-def list_sessions(agent: str | None, directory: str | None,
-                  since: str | None, before: str | None, limit: int):
+def list_sessions(agent: str | None, directory: str | None, since: str | None, before: str | None, limit: int):
     """List your recent AI coding sessions.
 
     Shows the most recent sessions across all agents, newest first.
@@ -255,7 +252,7 @@ def list_sessions(agent: str | None, directory: str | None,
       ais list --since "3 days ago" --agent devin
     """
     engine = SearchEngine()
-    _auto_index_if_empty(engine)
+    _ensure_index(engine)
     results = engine.list_sessions(agent=agent, directory=directory, limit=limit)
     title = "Recent Sessions"
     if since or before:
@@ -269,10 +266,8 @@ def list_sessions(agent: str | None, directory: str | None,
 
 @main.command()
 @click.argument("session_id", required=True)
-@click.option("--agent", "-a", default=None,
-              help="Specify the agent if session ID exists in multiple agents")
-@click.option("--messages", "-m", default=20,
-              help="Number of conversation turns to show (default: 20)")
+@click.option("--agent", "-a", default=None, help="Specify the agent if session ID exists in multiple agents")
+@click.option("--messages", "-m", default=20, help="Number of conversation turns to show (default: 20)")
 def preview(session_id: str, agent: str | None, messages: int):
     """Preview what happened in a session without resuming it.
 
@@ -288,34 +283,39 @@ def preview(session_id: str, agent: str | None, messages: int):
     result = engine.preview(session_id, agent=agent)
 
     if not result:
-        console.print(Panel(
-            f"[yellow]Session '{session_id}' not found.[/yellow]\n\n"
-            "Suggestions:\n"
-            f"  - Check the ID: [bold]ais search \"{session_id[:10]}\"[/bold]\n"
-            "  - Specify the agent: [bold]ais preview --agent devin <id>[/bold]\n"
-            "  - Rebuild the index: [bold]ais index[/bold]",
-            title="Session Not Found",
-            border_style="yellow",
-        ))
+        console.print(
+            Panel(
+                f"[yellow]Session '{session_id}' not found.[/yellow]\n\n"
+                "Suggestions:\n"
+                f'  - Check the ID: [bold]ais search "{session_id[:10]}"[/bold]\n'
+                "  - Specify the agent: [bold]ais preview --agent devin <id>[/bold]\n"
+                "  - Rebuild the index: [bold]ais index[/bold]",
+                title="Session Not Found",
+                border_style="yellow",
+            )
+        )
         return
 
     from pathlib import Path
+
     home = str(Path.home())
     d = result.directory
     if d.startswith(home):
-        d = "~" + d[len(home):]
+        d = "~" + d[len(home) :]
 
-    console.print(Panel(
-        f"[bold]Session:[/bold] {result.session_id}\n"
-        f"[bold]Agent:[/bold] {result.agent}\n"
-        f"[bold]Directory:[/bold] {d}\n"
-        f"[bold]Title:[/bold] {result.title or '(untitled)'}\n"
-        f"[bold]Started:[/bold] {result.start_time}\n"
-        f"[bold]Messages:[/bold] {result.total_messages} total "
-        f"({len(result.user_messages)} from you, {len(result.assistant_messages)} from agent)",
-        title="Session Info",
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Session:[/bold] {result.session_id}\n"
+            f"[bold]Agent:[/bold] {result.agent}\n"
+            f"[bold]Directory:[/bold] {d}\n"
+            f"[bold]Title:[/bold] {result.title or '(untitled)'}\n"
+            f"[bold]Started:[/bold] {result.start_time}\n"
+            f"[bold]Messages:[/bold] {result.total_messages} total "
+            f"({len(result.user_messages)} from you, {len(result.assistant_messages)} from agent)",
+            title="Session Info",
+            border_style="blue",
+        )
+    )
 
     console.print()
     shown = 0
@@ -326,8 +326,9 @@ def preview(session_id: str, agent: str | None, messages: int):
         if shown >= messages:
             remaining = result.total_messages - shown
             if remaining > 0:
-                console.print(f"\n[dim]... {remaining} more messages. "
-                              f"Use --messages {result.total_messages} to see all.[/dim]")
+                console.print(
+                    f"\n[dim]... {remaining} more messages. Use --messages {result.total_messages} to see all.[/dim]"
+                )
             break
 
         if msg.role == "user":
@@ -337,8 +338,7 @@ def preview(session_id: str, agent: str | None, messages: int):
         shown += 1
 
     console.print()
-    hint = _resume_hint(Session(
-        session_id=result.session_id, agent=result.agent, directory=result.directory))
+    hint = _resume_hint(Session(session_id=result.session_id, agent=result.agent, directory=result.directory))
     console.print(f"  [bold]To resume:[/bold] [green]{hint}[/green]")
 
 
@@ -409,7 +409,23 @@ def index():
             "supported agent (Devin, Claude Code, Cursor, or Windsurf).[/yellow]"
         )
     else:
-        console.print(f"\n[green]Ready! Try:[/green] ais search \"your keyword\"")
+        console.print('\n[green]Ready! Try:[/green] ais search "your keyword"')
+
+
+@main.command()
+def setup():
+    """Add (or refresh) the ais section in each detected agent's AGENTS.md.
+
+    This lets your AI agents know they can use `ais` to find past sessions.
+    Currently updates ~/.claude/AGENTS.md (Claude Code) and ~/.config/devin/AGENTS.md (Devin).
+
+    \b
+    Example:
+      ais setup
+    """
+    from ai_session_tracker.setup import setup_agents
+
+    setup_agents()
 
 
 if __name__ == "__main__":

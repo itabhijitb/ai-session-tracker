@@ -3,8 +3,8 @@
 [![PyPI version](https://badge.fury.io/py/ai-session-tracker.svg)](https://badge.fury.io/py/ai-session-tracker)
 [![Python versions](https://img.shields.io/pypi/pyversions/ai-session-tracker.svg)](https://pypi.org/project/ai-session-tracker/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/abhijit-bhattacharya/ai-session-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/abhijit-bhattacharya/ai-session-tracker/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/abhijit-bhattacharya/ai-session-tracker/branch/main/graph/badge.svg)](https://codecov.io/gh/abhijit-bhattacharya/ai-session-tracker)
+[![CI](https://github.com/itabhijitb/ai-session-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/itabhijitb/ai-session-tracker/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/itabhijitb/ai-session-tracker/branch/main/graph/badge.svg)](https://codecov.io/gh/itabhijitb/ai-session-tracker)
 
 Unified full-text search across AI coding agent sessions (Devin, Claude Code, Cursor, Windsurf).
 
@@ -29,7 +29,7 @@ pip install ai-session-tracker
 ### From Source
 
 ```bash
-git clone https://github.com/abhijit-bhattacharya/ai-session-tracker.git
+git clone https://github.com/itabhijitb/ai-session-tracker.git
 cd ai-session-tracker
 pip install -e .
 ```
@@ -61,6 +61,7 @@ ais list                       List recent sessions
 ais list --agent claude-code   List only Claude Code sessions
 ais status                      Show detected agents
 ais index                      Rebuild the search index
+ais setup                      Add ais instructions to your agents' AGENTS.md
 ais preview <session-id>       Preview a session without resuming
 ```
 
@@ -118,7 +119,7 @@ ai-session-tracker uses an **adapter pattern** where each agent has its own adap
 ### Setup Development Environment
 
 ```bash
-git clone https://github.com/abhijit-bhattacharya/ai-session-tracker.git
+git clone https://github.com/itabhijitb/ai-session-tracker.git
 cd ai-session-tracker
 pip install -e ".[dev]"
 ```

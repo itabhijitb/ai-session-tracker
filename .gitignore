@@ -9,3 +9,5 @@ build/
 venv/
 *.whl
 *.tar.gz
+.coverage
+coverage.xml

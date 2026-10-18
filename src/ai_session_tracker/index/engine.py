@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import platform
 import sqlite3
+import time
 from pathlib import Path
 
 from ai_session_tracker.adapters import ALL_ADAPTERS, BaseAdapter
@@ -38,6 +39,11 @@ class SearchEngine:
     def _init_db(self):
         db = self._conn()
         db.executescript("""
+            CREATE TABLE IF NOT EXISTS meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS sessions (
                 rowid        INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id   TEXT NOT NULL,
@@ -105,9 +111,17 @@ class SearchEngine:
                     (s.session_id, s.agent, s.directory, s.title, s.first_prompt, s.start_time, s.end_time, s.status),
                 )
             counts[adapter.name] = len(sessions)
+        db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_indexed', ?)", (str(time.time()),))
         db.commit()
         db.close()
         return counts
+
+    def last_indexed(self) -> float | None:
+        """Unix time of the last successful reindex, or None if never indexed."""
+        db = self._conn()
+        row = db.execute("SELECT value FROM meta WHERE key = 'last_indexed'").fetchone()
+        db.close()
+        return float(row["value"]) if row else None
 
     def search(self, query: str, agent: str | None = None, limit: int = 30) -> list[Session]:
         """Fast FTS5 search across indexed titles, prompts, and directories."""
@@ -175,7 +189,13 @@ class SearchEngine:
         return [self._row_to_session(r) for r in rows]
 
     def preview(self, session_id: str, agent: str | None = None) -> SessionPreview | None:
-        """Get a conversation preview for a session. Tries each adapter until one succeeds."""
+        """Get a conversation preview for a session. Tries each adapter until one succeeds.
+
+        Accepts a unique ID prefix (tables show truncated IDs), resolved via the index.
+        """
+        resolved = self.resolve_session_id(session_id, agent)
+        if resolved:
+            session_id, agent = resolved
         for adapter in self._adapters:
             if agent and adapter.name != agent:
                 continue
@@ -185,6 +205,23 @@ class SearchEngine:
             if result:
                 return result
         return None
+
+    def resolve_session_id(self, prefix: str, agent: str | None = None) -> tuple[str, str] | None:
+        """Map an exact ID or unique ID prefix to (session_id, agent). None if missing or ambiguous."""
+        db = self._conn()
+        sql = "SELECT session_id, agent FROM sessions WHERE (session_id = ? OR substr(session_id, 1, ?) = ?)"
+        params: list = [prefix, len(prefix), prefix]
+        if agent:
+            sql += " AND agent = ?"
+            params.append(agent)
+        rows = db.execute(sql, params).fetchall()
+        db.close()
+        exact = [r for r in rows if r["session_id"] == prefix]
+        if len(exact) == 1:
+            rows = exact
+        if len(rows) != 1:
+            return None
+        return rows[0]["session_id"], rows[0]["agent"]
 
     def status(self) -> list[dict]:
         """Return per-adapter availability and session counts."""

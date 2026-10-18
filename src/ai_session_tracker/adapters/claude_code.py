@@ -67,13 +67,16 @@ class ClaudeCodeAdapter(BaseAdapter):
         for proj_dir in PROJECTS_DIR.iterdir():
             if not proj_dir.is_dir():
                 continue
-            directory = _decode_project_dir(proj_dir.name)
+            decoded_dir = _decode_project_dir(proj_dir.name)
             for jsonl_file in proj_dir.glob("*.jsonl"):
                 sid = jsonl_file.stem
                 title = ""
                 first_prompt = ""
                 timestamp = ""
+                cwd = ""
                 for entry in _read_jsonl_safe(jsonl_file, max_lines=10):
+                    if not cwd and entry.get("cwd"):
+                        cwd = entry["cwd"]
                     if entry.get("type") == "user" and "message" in entry:
                         msg = entry["message"]
                         content = msg.get("content", "") if isinstance(msg, dict) else str(msg)
@@ -83,12 +86,13 @@ class ClaudeCodeAdapter(BaseAdapter):
                         timestamp = entry["timestamp"]
 
                 hist = history.get(sid, {})
-                if not directory or directory == proj_dir.name:
-                    directory = hist.get("project", directory)
+                # The encoded folder name is lossy ("-" can be "/" or a literal "-"), so prefer the real cwd
+                directory = cwd or hist.get("project") or decoded_dir
                 if not timestamp and hist.get("timestamp"):
                     ts = hist["timestamp"]
                     if isinstance(ts, (int, float)):
                         from datetime import datetime
+
                         timestamp = datetime.fromtimestamp(ts / 1000).isoformat()
 
                 sessions.append(
@@ -109,24 +113,28 @@ class ClaudeCodeAdapter(BaseAdapter):
         if not self.is_available():
             return []
         query_lower = query.lower()
+        history = self._build_history_index()
         matches = []
         for proj_dir in PROJECTS_DIR.iterdir():
             if not proj_dir.is_dir():
                 continue
-            directory = _decode_project_dir(proj_dir.name)
+            decoded_dir = _decode_project_dir(proj_dir.name)
             for jsonl_file in proj_dir.glob("*.jsonl"):
                 sid = jsonl_file.stem
                 found = False
                 first_prompt = ""
                 timestamp = ""
+                cwd = ""
                 try:
                     with open(jsonl_file, "r", encoding="utf-8", errors="replace") as f:
                         for line in f:
-                            if not timestamp:
+                            if not (timestamp and cwd and first_prompt):
                                 try:
                                     entry = json.loads(line)
-                                    if "timestamp" in entry:
+                                    if not timestamp and "timestamp" in entry:
                                         timestamp = entry["timestamp"]
+                                    if not cwd and entry.get("cwd"):
+                                        cwd = entry["cwd"]
                                     if entry.get("type") == "user" and not first_prompt:
                                         msg = entry.get("message", {})
                                         content = msg.get("content", "") if isinstance(msg, dict) else str(msg)
@@ -143,7 +151,7 @@ class ClaudeCodeAdapter(BaseAdapter):
                         Session(
                             session_id=sid,
                             agent="claude-code",
-                            directory=directory,
+                            directory=cwd or history.get(sid, {}).get("project") or decoded_dir,
                             first_prompt=first_prompt,
                             start_time=str(timestamp),
                             status="native",
@@ -172,9 +180,12 @@ class ClaudeCodeAdapter(BaseAdapter):
         messages: list[Message] = []
         title = ""
         start_time = ""
+        cwd = ""
         for entry in entries:
             if not start_time and "timestamp" in entry:
                 start_time = str(entry["timestamp"])
+            if not cwd and entry.get("cwd"):
+                cwd = entry["cwd"]
             etype = entry.get("type", "")
             if etype not in ("user", "assistant"):
                 continue
@@ -182,8 +193,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             if isinstance(msg, dict):
                 content = msg.get("content", "")
                 if isinstance(content, list):
-                    text_parts = [p.get("text", "") for p in content
-                                  if isinstance(p, dict) and p.get("type") == "text"]
+                    text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"]
                     content = " ".join(text_parts)
             else:
                 content = str(msg)
@@ -196,7 +206,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             session_id=session_id,
             agent="claude-code",
             title=title,
-            directory=directory,
+            directory=cwd or directory,
             start_time=start_time,
             messages=messages,
             total_messages=len(messages),

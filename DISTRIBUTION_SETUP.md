@@ -66,7 +66,7 @@ git commit -m "Initial commit"
 git branch -M main
 
 # Add remote (replace with your actual repo URL)
-git remote add origin https://github.com/abhijit-bhattacharya/ai-session-tracker.git
+git remote add origin https://github.com/itabhijitb/ai-session-tracker.git
 
 # Push to GitHub
 git push -u origin main
@@ -79,7 +79,7 @@ git push -u origin main
 3. Configure trusted publishing:
    - Go to PyPI account settings → Publishing
    - Add GitHub as publisher
-   - Select your repository: `abhijit-bhattacharya/ai-session-tracker`
+   - Select your repository: `itabhijitb/ai-session-tracker`
    - Workflow name: `publish.yml`
    - Environment name: `pypi`
 

@@ -36,18 +36,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-cov", "ruff"]
+dev = ["pytest>=7.0", "pytest-cov", "ruff==0.17.1"]
 test = ["pytest>=7.0", "pytest-cov"]
 
 [project.scripts]
 ais = "ai_session_tracker.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/abhijit-bhattacharya/ai-session-tracker"
-Documentation = "https://github.com/abhijit-bhattacharya/ai-session-tracker#readme"
-Repository = "https://github.com/abhijit-bhattacharya/ai-session-tracker"
-Issues = "https://github.com/abhijit-bhattacharya/ai-session-tracker/issues"
-Changelog = "https://github.com/abhijit-bhattacharya/ai-session-tracker/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/itabhijitb/ai-session-tracker"
+Documentation = "https://github.com/itabhijitb/ai-session-tracker#readme"
+Repository = "https://github.com/itabhijitb/ai-session-tracker"
+Issues = "https://github.com/itabhijitb/ai-session-tracker/issues"
+Changelog = "https://github.com/itabhijitb/ai-session-tracker/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ai_session_tracker"]
@@ -57,3 +57,6 @@ line-length = 120
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "CHANGELOG.md", "pyproject.toml"]

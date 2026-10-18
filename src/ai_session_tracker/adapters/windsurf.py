@@ -38,9 +38,7 @@ class WindsurfAdapter(BaseAdapter):
     name = "windsurf"
 
     def is_available(self) -> bool:
-        return any(
-            (base / ch).exists() for base in CODEIUM_DIRS for ch in CHANNELS
-        )
+        return any((base / ch).exists() for base in CODEIUM_DIRS for ch in CHANNELS)
 
     def list_sessions(self) -> list[Session]:
         if not self.is_available():

@@ -3,6 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
+
+
+def normalize_timestamp(value) -> str:
+    """Normalize epoch (s/ms) or ISO timestamps to local time 'YYYY-MM-DD HH:MM:SS'.
+
+    Agents store times differently (Claude Code: UTC ISO with 'Z', Devin: local
+    'YYYY-MM-DD HH:MM:SS', some: epoch millis). A single format keeps sorting and
+    date filtering correct across agents. Unparseable values are returned as-is.
+    """
+    if value is None or value == "":
+        return ""
+    try:
+        if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip().isdigit()):
+            ts = float(value)
+            dt = datetime.fromtimestamp(ts / 1000 if ts > 1e11 else ts)
+        else:
+            dt = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+            if dt.tzinfo is not None:
+                dt = dt.astimezone().replace(tzinfo=None)
+    except (ValueError, OverflowError, OSError):
+        return str(value)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 @dataclass
@@ -17,8 +40,13 @@ class Message:
     def short_content(self) -> str:
         """First 200 chars, stripped of XML tags and whitespace."""
         text = self.content.strip()
-        for tag in ("<local-command-caveat>", "<command-name>", "<command-message>",
-                     "<command-args>", "<local-command-stdout>"):
+        for tag in (
+            "<local-command-caveat>",
+            "<command-name>",
+            "<command-message>",
+            "<command-args>",
+            "<local-command-stdout>",
+        ):
             if text.startswith(tag):
                 return ""
         if len(text) > 200:
@@ -37,6 +65,9 @@ class SessionPreview:
     start_time: str
     messages: list[Message] = field(default_factory=list)
     total_messages: int = 0
+
+    def __post_init__(self):
+        self.start_time = normalize_timestamp(self.start_time)
 
     @property
     def user_messages(self) -> list[Message]:
@@ -62,6 +93,10 @@ class Session:
     message_count: int = 0
     extra: dict = field(default_factory=dict)
 
+    def __post_init__(self):
+        self.start_time = normalize_timestamp(self.start_time)
+        self.end_time = normalize_timestamp(self.end_time)
+
     @property
     def display_title(self) -> str:
         return self.title or self.first_prompt or "(untitled)"
@@ -75,5 +110,5 @@ class Session:
         d = self.directory
         home = str(__import__("pathlib").Path.home())
         if d.startswith(home):
-            d = "~" + d[len(home):]
+            d = "~" + d[len(home) :]
         return d[-45:] if len(d) > 45 else d

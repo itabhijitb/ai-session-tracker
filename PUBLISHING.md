@@ -13,7 +13,7 @@ This guide explains how to publish ai-session-tracker to PyPI and GitHub.
    git add .
    git commit -m "Initial commit"
    git branch -M main
-   git remote add origin https://github.com/abhijit-bhattacharya/ai-session-tracker.git
+   git remote add origin https://github.com/itabhijitb/ai-session-tracker.git
    git push -u origin main
    ```
 
@@ -40,7 +40,7 @@ This guide explains how to publish ai-session-tracker to PyPI and GitHub.
    - Go to your PyPI account settings
    - Navigate to "Publishing" → "Add a new publisher"
    - Select "GitHub" as the publisher
-   - Select your GitHub repository: `abhijit-bhattacharya/ai-session-tracker`
+   - Select your GitHub repository: `itabhijitb/ai-session-tracker`
    - Configure the workflow name: `publish.yml`
    - Set the environment name: `pypi`
    - Save the configuration
